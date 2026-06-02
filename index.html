@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="no" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="RettskildeSøk PRO – Profesjonell søkeaggregator for norske og internasjonale rettskilder">
+  <meta name="theme-color" content="#1e40af">
+
+  <!-- Open Graph (deling) -->
+  <meta property="og:title" content="RettskildeSøk PRO">
+  <meta property="og:description" content="Søk i alle norske rettskilder, domstoler, nemnder og internasjonale databaser fra ett sted.">
+  <meta property="og:type" content="website">
+
+  <title>RettskildeSøk PRO</title>
+
+  <!-- Favicon inline SVG -->
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚖️</text></svg>">
+
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<div id="appLayout">
+
+  <!-- =========================================================
+       SIDEBAR – KILDERVELGER
+       ========================================================= -->
+  <aside id="sidebar" class="closed" role="navigation" aria-label="Rettskilder">
+    <div class="sidebar-header">
+      <h2>⚖️ Rettskilder & Filtre</h2>
+      <button class="btn btn-secondary btn-sm" onclick="setSidebarOpen(false)" aria-label="Lukk kildeliste">
+        ✕ <kbd>Alt+B</kbd>
+      </button>
+    </div>
+
+    <div class="sidebar-body">
+
+      <!-- Kildesøk -->
+      <div class="source-filter-wrap">
+        <span class="source-filter-icon">🔍</span>
+        <input type="text" placeholder="Filtrer kilder..." oninput="filterSources(this.value)" aria-label="Søk i kildelisten">
+      </div>
+
+      <!-- Velg alle / fjern alle -->
+      <div class="toggle-row">
+        <button class="btn btn-secondary btn-sm" onclick="toggleAllSources(true)">✓ Velg alle</button>
+        <button class="btn btn-secondary btn-sm" onclick="toggleAllSources(false)">✕ Fjern alle</button>
+      </div>
+
+      <!-- Egne sider -->
+      <div class="custom-sites-section">
+        <span class="section-label">🌐 Egne sider (fast lagret)</span>
+        <div class="custom-site-input-row">
+          <input type="text" id="customSiteInput" placeholder="f.eks. kommunen.no/juss" aria-label="Legg til eget nettsted">
+          <button class="btn btn-primary btn-sm" onclick="addCustomSite()">Legg til</button>
+        </div>
+        <div id="customSitesContainer">
+          <span class="empty-note">Ingen egne sider lagt til ennå.</span>
+        </div>
+      </div>
+
+      <!-- Dynamisk genererte kildelister (fra sources.js) -->
+      <div id="sourcesContainer"></div>
+
+    </div>
+  </aside>
+
+  <!-- Overlay for mobil -->
+  <div id="sidebarOverlay" onclick="setSidebarOpen(false)" aria-hidden="true"></div>
+
+  <!-- =========================================================
+       MAIN – TOPBAR + INNHOLD
+       ========================================================= -->
+  <div id="mainContent">
+
+    <!-- TOPBAR -->
+    <header id="topbar">
+      <div class="topbar-brand">
+        <button class="btn btn-secondary btn-sm" id="sidebarToggleBtn"
+          onclick="toggleSidebar()" aria-label="Åpne/lukk kildeliste">
+          ☰ Kilder
+        </button>
+        <div class="brand-logo">⚖</div>
+        <div>
+          <div class="brand-name">RettskildeSøk PRO</div>
+          <div class="brand-version">v2.0 · GitHub Pages</div>
+        </div>
+      </div>
+
+      <div class="topbar-spacer"></div>
+
+      <div class="topbar-actions">
+        <button class="btn btn-secondary btn-sm" onclick="exportAllData()" title="Eksporter alt (søk, notater, innstillinger) til JSON-fil">
+          📥 Backup
+        </button>
+        <button class="btn btn-secondary btn-sm" onclick="triggerImport()" title="Gjenopprett fra JSON-backupfil">
+          📤 Gjenopprett
+        </button>
+        <input type="file" id="importFileInput" style="display:none" accept=".json" onchange="importAllData(event)">
+        <button class="btn btn-secondary btn-sm" id="themeToggleBtn" onclick="toggleTheme()">
+          🌙 Mørkt
+        </button>
+      </div>
+    </header>
+
+    <!-- PAGE CONTENT -->
+    <main id="pageContent">
+
+      <!-- TABS -->
+      <nav class="tab-nav" role="tablist">
+        <button class="tab-btn active" data-tab="search-tab" onclick="switchTab('search-tab')" role="tab">
+          🔍 Søk & Arbeidsbenk
+        </button>
+        <button class="tab-btn" data-tab="library-tab" id="libraryTabBtn" onclick="switchTab('library-tab')" role="tab">
+          📚 Bibliotek (0)
+        </button>
+        <button class="tab-btn" data-tab="help-tab" onclick="switchTab('help-tab')" role="tab">
+          ❓ Hjelp & Snarveier
+        </button>
+      </nav>
+
+      <!-- ===================================================
+           TAB 1: SØK & ARBEIDSBENK
+           =================================================== -->
+      <div id="search-tab" class="tab-panel active" role="tabpanel">
+
+        <!-- Tekstparser -->
+        <div class="parser-section">
+          <div class="section-title">📋 Automatisk kildegjenkjenner</div>
+          <textarea id="rawTextParser" rows="2"
+            placeholder="Lim inn råtekst, e-post eller saksnotat her – appen haker automatisk av relevante kilder i sidepanelet basert på innholdet."
+            aria-label="Tekst for automatisk kildegjenkjenning"></textarea>
+        </div>
+
+        <!-- Fagområdebundles -->
+        <div class="bundle-bar">
+          <span class="bundle-label">Fagområde:</span>
+          <button class="btn-bundle" onclick="applyBundle('arbeidsrett')">👷 Arbeidsrett</button>
+          <button class="btn-bundle" onclick="applyBundle('forretningsjus')">🏢 Forretningsjus & Skatt</button>
+          <button class="btn-bundle" onclick="applyBundle('forvaltning')">🏛️ Forvaltningsrett</button>
+          <button class="btn-bundle" onclick="applyBundle('strafferett')">⚖️ Strafferett</button>
+          <button class="btn-bundle" onclick="applyBundle('familierett')">👨‍👩‍👧 Familie & Arv</button>
+          <button class="btn-bundle" onclick="applyBundle('menneskerett')">🌍 Menneskerettigheter</button>
+          <button class="btn-bundle" onclick="applyBundle('domstoler')">🏛 Kun domstoler</button>
+          <button class="btn-bundle" onclick="applyBundle('all')">✓ Alle kilder</button>
+        </div>
+
+        <!-- Søkeboks -->
+        <div class="search-card">
+          <form onsubmit="executeSearch(event)" id="searchForm">
+
+            <div class="engine-query-row">
+              <!-- Søkemotor -->
+              <select id="engineSelect" onchange="onEngineChange()" aria-label="Velg søkemotor">
+                <option value="google">🔍 Google</option>
+                <option value="bing">🔎 Bing</option>
+                <option value="duckduckgo">🦆 DuckDuckGo</option>
+                <option value="scholar">🎓 Google Scholar</option>
+                <option value="base">🌐 BASE (Bielefeld)</option>
+                <option value="lovdata">⚖️ Lovdata Direkte</option>
+                <option value="rettsdata">📚 Rettsdata Direkte</option>
+              </select>
+
+              <!-- Søkefelt -->
+              <input type="text" id="queryInput"
+                placeholder="Søkeord, boolsk uttrykk, paragraf... (Ctrl+Shift+F)"
+                autocomplete="off" spellcheck="false"
+                oninput="updateURLParams()"
+                aria-label="Søkeord">
+
+              <!-- Søk-knapp -->
+              <button type="submit" class="btn btn-primary search-btn">
+                Søk nå <kbd>Ctrl+↵</kbd>
+              </button>
+            </div>
+
+            <!-- Motor-notat -->
+            <div id="engineNote" class="engine-note"></div>
+
+            <!-- Boolske operatorer -->
+            <div class="operator-bar">
+              <span class="op-label">Operatorer:</span>
+              <button type="button" class="btn-op" onclick="insertOperator('phrase')" title="Sett inn eksakt frase">"…"</button>
+              <button type="button" class="btn-op" onclick="insertOperator('and')">AND</button>
+              <button type="button" class="btn-op" onclick="insertOperator('or')">OR</button>
+              <button type="button" class="btn-op" onclick="insertOperator('not')">-ord</button>
+              <button type="button" class="btn-op" onclick="insertOperator('siteNot')">-site:</button>
+              <button type="button" class="btn-op" onclick="insertOperator('wildcard')">trunkering*</button>
+              <button type="button" class="btn-op btn-outline" onclick="copyQueryString()" title="Kopier ferdig søkestreng">📋 Kopier streng</button>
+              <button type="button" class="btn-op btn-outline" onclick="copyDeepLink()" title="Del lenke til akkurat dette søket">🔗 Del søket</button>
+            </div>
+
+            <!-- Avanserte filtre -->
+            <details id="advancedSection" class="advanced-details">
+              <summary>⚙️ Avanserte filtre & tidsrom</summary>
+              <div class="advanced-grid">
+                <div class="adv-field">
+                  <label for="exactMatch">Eksakt frase</label>
+                  <input type="text" id="exactMatch" placeholder="vesentlig mislighold" oninput="updateURLParams()">
+                </div>
+                <div class="adv-field">
+                  <label for="excludeWords">Ekskluder ord</label>
+                  <input type="text" id="excludeWords" placeholder="prøvetid intern" oninput="updateURLParams()">
+                </div>
+                <div class="adv-field">
+                  <label for="fileType">Begrens filtype</label>
+                  <select id="fileType" onchange="updateURLParams()">
+                    <option value="">Alle filtyper</option>
+                    <option value="pdf">PDF (.pdf)</option>
+                    <option value="doc">Word (.doc/.docx)</option>
+                  </select>
+                </div>
+                <div class="adv-field">
+                  <label>Hurtigvalg tidsrom</label>
+                  <div class="date-quick-btns">
+                    <button type="button" class="btn btn-secondary btn-xs" onclick="setRelativeTime(1)">Siste år</button>
+                    <button type="button" class="btn btn-secondary btn-xs" onclick="setRelativeTime(3)">Siste 3 år</button>
+                    <button type="button" class="btn btn-secondary btn-xs" onclick="setRelativeTime(5)">Siste 5 år</button>
+                    <button type="button" class="btn btn-secondary btn-xs" onclick="setRelativeTime(10)">Siste 10 år</button>
+                  </div>
+                </div>
+                <div class="adv-field">
+                  <label>Tidsrom (årstall)</label>
+                  <div class="flex gap-2">
+                    <input type="number" id="yearFrom" placeholder="Fra" min="1800" max="2100" oninput="updateURLParams()" style="width:50%">
+                    <input type="number" id="yearTo" placeholder="Til" min="1800" max="2100" oninput="updateURLParams()" style="width:50%">
+                  </div>
+                </div>
+              </div>
+            </details>
+
+          </form>
+
+          <!-- Kompilert søkestreng-visning -->
+          <div id="compiledStringDisplay">
+            <div class="compiled-label">🔎 Sendt søkestreng</div>
+            <code id="compiledStringCode"></code>
+          </div>
+        </div>
+
+        <!-- Lagre-knapp -->
+        <div class="flex justify-between items-center" style="margin-bottom: 16px;">
+          <span style="font-size:0.78rem; color:var(--text-3);">
+            Tipstekst: Velg kilder i sidepanelet og skriv søkeord, trykk Søk nå.
+          </span>
+          <button class="btn btn-success btn-sm" onclick="saveCurrentSearch()">
+            💾 Lagre søk <kbd>Ctrl+S</kbd>
+          </button>
+        </div>
+
+        <!-- ---- ARBEIDSBOK ---- -->
+        <div class="workbook-card">
+          <div class="workbook-header">
+            <span class="wb-title">📄 Arbeidsbok:</span>
+            <select id="workbookSelector" onchange="switchWorkbook(this.value)" aria-label="Velg arbeidsbok"></select>
+            <span id="autosaveIndicator">✓ Lagret</span>
+            <div class="flex gap-2" style="margin-left:auto;">
+              <button class="btn btn-secondary btn-sm" onclick="newWorkbook()">＋ Ny bok</button>
+              <button class="btn btn-secondary btn-sm" onclick="exportWorkbookText()">📝 Eksporter</button>
+              <button class="btn btn-secondary btn-sm" style="color:var(--danger);" onclick="deleteCurrentWorkbook()">Slett</button>
+            </div>
+          </div>
+
+          <div class="editor-toolbar" role="toolbar" aria-label="Tekstredigering">
+            <button type="button" class="toolbar-btn" onclick="insertFormatting('bold')" title="Fet (Ctrl+B)"><b>B</b></button>
+            <button type="button" class="toolbar-btn" onclick="insertFormatting('italic')" title="Kursiv (Ctrl+I)"><i>I</i></button>
+            <button type="button" class="toolbar-btn" onclick="insertFormatting('underline')" title="Understrek (Ctrl+U)"><u>U</u></button>
+            <div class="toolbar-divider"></div>
+            <button type="button" class="toolbar-btn" onclick="insertHeading(2)">H2</button>
+            <button type="button" class="toolbar-btn" onclick="insertHeading(3)">H3</button>
+            <button type="button" class="toolbar-btn" onclick="insertFormatting('insertUnorderedList')">• Liste</button>
+            <button type="button" class="toolbar-btn" onclick="insertFormatting('insertOrderedList')">1. Numm.</button>
+            <div class="toolbar-divider"></div>
+            <button type="button" class="toolbar-btn accent" onclick="clipSourcesIntoEditor()" title="Sett inn liste over aktive kilder">📌 Kildeliste</button>
+            <button type="button" class="toolbar-btn highlight" onclick="runLawAutolink()" title="Konverter lovreferanser til Lovdata-lenker">🔗 Autolenk lover</button>
+            <div class="toolbar-divider"></div>
+            <button type="button" class="toolbar-btn" onclick="insertFormatting('removeFormat')">Nullstill</button>
+          </div>
+
+          <div id="workbookEditor"
+            contenteditable="true"
+            oninput="onEditorInput()"
+            spellcheck="true"
+            aria-label="Arbeidsbok editor"
+            role="textbox"
+            aria-multiline="true"></div>
+        </div>
+
+      </div><!-- /search-tab -->
+
+      <!-- ===================================================
+           TAB 2: BIBLIOTEK
+           =================================================== -->
+      <div id="library-tab" class="tab-panel" role="tabpanel">
+
+        <div class="library-section">
+          <h3 class="library-section-title">💾 Dine lagrede søkekonfigurasjoner</h3>
+          <div id="savedSearchesList" class="list-group"></div>
+        </div>
+
+        <div class="library-section">
+          <h3 class="library-section-title">⏱ Søkehistorikk (siste 30)</h3>
+          <div id="historyList" class="list-group"></div>
+        </div>
+
+      </div><!-- /library-tab -->
+
+      <!-- ===================================================
+           TAB 3: HJELP & SNARVEIER
+           =================================================== -->
+      <div id="help-tab" class="tab-panel" role="tabpanel">
+        <div class="about-section">
+          <h2>⚖️ RettskildeSøk PRO – Hjelp og veiledning</h2>
+
+          <p>
+            RettskildeSøk PRO er et åpent, gratis søkeverktøy for norsk og internasjonal rett.
+            Verktøyet hjelper deg å bygge presisjons-søkestrenger og sende dem videre til de riktige kildene,
+            alt fra Lovdata og Høyesterett til EU-domstolen og FNs traktatbase.
+          </p>
+
+          <h3>🚀 Kom i gang</h3>
+          <ul>
+            <li>Åpne <strong>kildelisten</strong> (☰-knappen) og velg relevante databaser.</li>
+            <li>Skriv søkeord i søkefeltet og trykk <strong>Søk nå</strong>.</li>
+            <li>Bruk <strong>Fagområde-knappene</strong> for å velge relevante kildesett raskt.</li>
+            <li>Lagre søkekonfigurasjoner med <strong>Lagre søk</strong> og gjenbruk dem fra Bibliotek-fanen.</li>
+          </ul>
+
+          <h3>🔣 Boolske operatorer</h3>
+          <ul>
+            <li><code>"eksakt frase"</code> – søk etter nøyaktig denne kombinasjonen av ord</li>
+            <li><code>ord1 AND ord2</code> – begge ord må forekomme</li>
+            <li><code>ord1 OR ord2</code> – ett av ordene er nok</li>
+            <li><code>-ord</code> – ekskluder sider som inneholder dette ordet</li>
+            <li><code>arbeids*</code> – trunkering (treff på arbeidsrett, arbeidsmiljø osv.)</li>
+          </ul>
+
+          <h3>🔗 Autolenking av lovreferanser</h3>
+          <p>
+            I arbeidsboken kan du skrive referanser som <code>Lov-2005-06-17-90</code>,
+            <code>HR-2022-123-A</code>, <code>Rt-1990-456</code> eller <code>FOR-2020-01-01-1</code>
+            og deretter trykke <strong>🔗 Autolenk lover</strong> for å gjøre dem om til klikkbare Lovdata-lenker.
+          </p>
+
+          <h3>💡 Synonym-ekspansjon (tesaurus)</h3>
+          <p>
+            Dersom du søker på ett av ordene nedenfor, utvider appen automatisk søket til å inkludere
+            juridiske synonymer: <em>mislighold, oppsigelse, erstatning, mangel, ekspropriasjon,
+            straff, personvern, diskriminering, voldgift, fusjon.</em>
+          </p>
+
+          <h3>⌨️ Tastatursnarveier</h3>
+          <table class="shortcut-table">
+            <tr><td><kbd>Ctrl</kbd> + <kbd>Enter</kbd></td><td>Utfør søk</td></tr>
+            <tr><td><kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>F</kbd></td><td>Hopp til søkefelt</td></tr>
+            <tr><td><kbd>Ctrl</kbd> + <kbd>S</kbd></td><td>Lagre søkekonfigurasjon</td></tr>
+            <tr><td><kbd>Alt</kbd> + <kbd>B</kbd></td><td>Åpne/lukk kildeliste</td></tr>
+          </table>
+
+          <h3>🌐 Søkemotorer</h3>
+          <ul>
+            <li><strong>Google / Bing / DuckDuckGo</strong> – generelle søkemotorer med site:-filtrering</li>
+            <li><strong>Google Scholar</strong> – akademiske artikler og juridisk litteratur</li>
+            <li><strong>BASE (Bielefeld)</strong> – europeisk vitenskapelig åpen-tilgang-base</li>
+            <li><strong>Lovdata Direkte</strong> – søker direkte i Lovdatas database (ingen site:-filter)</li>
+            <li><strong>Rettsdata Direkte</strong> – Gyldendals juridiske database (abonnement)</li>
+          </ul>
+
+          <h3>📦 Lagring og backup</h3>
+          <p>
+            Alt lagres lokalt i nettleserens <code>localStorage</code> – ingen server, ingen skylagring.
+            Bruk <strong>Backup</strong>-knappen øverst til å eksportere alt til en JSON-fil,
+            og <strong>Gjenopprett</strong> for å importere på nytt (eller på en annen enhet).
+          </p>
+
+          <h3>🛠 Teknisk info</h3>
+          <p>
+            Ren HTML5 + CSS3 + Vanilla JavaScript. Ingen eksterne avhengigheter.
+            Funksjonerer 100% offline etter første lasting.
+            Designet for GitHub Pages – kan hostes gratis på
+            <a href="https://pages.github.com" target="_blank">pages.github.com</a>.
+          </p>
+        </div>
+      </div><!-- /help-tab -->
+
+    </main><!-- /pageContent -->
+  </div><!-- /mainContent -->
+</div><!-- /appLayout -->
+
+<!-- =====================================================
+     ENGINE NOTE MAP (inline) – vises etter motorvalg
+     ===================================================== -->
+<script>
+  const ENGINE_NOTES = {
+    google:    'Google: Støtter site:, filetype:, after:/before: dato-filtre. Beste allround-valg.',
+    bing:      'Bing: Støtter site: og filetype:. Dato-filtre er ikke alltid pålitelige via URL.',
+    duckduckgo:'DuckDuckGo: Støtter site:. Ingen sporingsdata lagres. Ingen filtype-filtre.',
+    scholar:   'Google Scholar: Ideelt for juridisk teori, artikler og avhandlinger. Dato-filtre fungerer.',
+    base:      'BASE: Europeisk akademisk åpen-tilgangs-søkemotor. Bruker url: i stedet for site:.',
+    lovdata:   'Lovdata Direkte: Søker bare i Lovdata – ingen kilde-filtrering. Fulltekst krever ev. abonnement.',
+    rettsdata: 'Rettsdata: Gyldendals database – dekker juridisk litteratur og dommer. Krever abonnement.',
+  };
+
+  function onEngineChange() {
+    const val = document.getElementById('engineSelect')?.value;
+    const noteEl = document.getElementById('engineNote');
+    if (noteEl) noteEl.textContent = ENGINE_NOTES[val] || '';
+    updateURLParams();
+  }
+
+  // Trigger on page load
+  document.addEventListener('DOMContentLoaded', () => {
+    onEngineChange();
+  });
+</script>
+
+<!-- Scripts (rekkefølge er viktig) -->
+<script src="js/sources.js"></script>
+<script src="js/app.js"></script>
+
+</body>
+</html>
